@@ -67,7 +67,7 @@ export default function Home() {
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-100/90">
               Coordinate vessel movement, terminal activity, compliance checks,
               and cargo throughput from one calm control surface built for
-              modern harbor teams.
+              modern harbor team.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
