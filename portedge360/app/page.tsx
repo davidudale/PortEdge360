@@ -59,7 +59,7 @@ export default function Home() {
        <div className="mx-auto flex min-h-[calc(88svh-92px)] max-w-7xl items-center py-16">
           <div className="max-w-3xl">
             <div className="mb-5 inline-flex rounded-md border border-cyan-200/30 bg-cyan-100/10 px-3 py-1 text-sm font-medium text-cyan-50 backdrop-blur">
-              Maritime command, cargo flow, and berth intelligence
+              Maritime command, cargo flow, and berth intelligences
             </div>
             <h1 className="text-5xl font-semibold leading-[1.02] text-white sm:text-6xl lg:text-7xl">
               Port Authority operations with a clearer command view.
