@@ -1,7 +1,18 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { FirebaseError } from "firebase/app";
+import { doc, getDoc } from "firebase/firestore";
+import {
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signOut,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import { auth, db } from "../Auth/firebase";
+import { getDashboardPathForRole, isUserRole } from "../Auth/roles";
 
 type FieldErrors = {
   email?: string;
@@ -12,13 +23,53 @@ type LoginMode = "sign-in" | "forgot-password";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function getAuthErrorMessage(error: unknown) {
+  if (!(error instanceof FirebaseError)) {
+    return "Something went wrong. Please try again.";
+  }
+
+  switch (error.code) {
+    case "auth/invalid-credential":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return "Invalid email address or password.";
+    case "auth/invalid-email":
+      return "Enter a valid email address.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait and try again.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    default:
+      return "Unable to complete the request. Please try again.";
+  }
+}
+
+async function getUserDashboardPath(uid: string) {
+  const profileSnap = await getDoc(doc(db, "users", uid));
+
+  if (!profileSnap.exists()) {
+    return null;
+  }
+
+  const profile = profileSnap.data();
+  const role = isUserRole(profile.role)
+    ? profile.role
+    : isUserRole(profile.requestedAccessLevel)
+      ? profile.requestedAccessLevel
+      : null;
+
+  return role ? getDashboardPathForRole(role) : null;
+}
+
 export default function LoginPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<LoginMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   function validateForm() {
     const nextErrors: FieldErrors = {};
@@ -45,7 +96,7 @@ export default function LoginPage() {
     return Object.keys(nextErrors).length === 0;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!validateForm()) {
@@ -53,12 +104,75 @@ export default function LoginPage() {
     }
 
     setIsSigningIn(true);
-    toast.info("Signing in...");
 
-    window.setTimeout(() => {
+    try {
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
+      if (!credential.user.emailVerified) {
+        try {
+          await sendEmailVerification(credential.user, {
+            url: `${window.location.origin}/login`,
+          });
+        } catch {
+          // Firebase rate-limits verification emails; login is still blocked.
+        }
+        await signOut(auth);
+        toast.info(
+          "Verify your email before signing in. Check your inbox for the verification link.",
+        );
+        return;
+      }
+
+      const dashboardPath = await getUserDashboardPath(credential.user.uid);
+
+      if (!dashboardPath) {
+        await signOut(auth);
+        toast.error("Your account does not have an assigned dashboard role.");
+        return;
+      }
+
+      toast.success("Signed in successfully.");
+      router.push(dashboardPath);
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
       setIsSigningIn(false);
-      toast.error("Invalid email address or password.");
-    }, 900);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsResendingVerification(true);
+
+    try {
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
+      if (credential.user.emailVerified) {
+        toast.info("This email address is already verified. You can sign in.");
+        return;
+      }
+
+      await sendEmailVerification(credential.user, {
+        url: `${window.location.origin}/login`,
+      });
+      toast.success("Verification email sent. Check your inbox.");
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      await signOut(auth).catch(() => {});
+      setIsResendingVerification(false);
+    }
   }
 
   function validateResetForm() {
@@ -80,7 +194,7 @@ export default function LoginPage() {
     return Object.keys(nextErrors).length === 0;
   }
 
-  function handlePasswordReset(event: FormEvent<HTMLFormElement>) {
+  async function handlePasswordReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!validateResetForm()) {
@@ -88,12 +202,16 @@ export default function LoginPage() {
     }
 
     setIsSendingReset(true);
-    toast.info("Preparing password reset request...");
 
-    window.setTimeout(() => {
-      setIsSendingReset(false);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
       toast.success("If the account exists, a reset link will be sent.");
-    }, 900);
+      setMode("sign-in");
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsSendingReset(false);
+    }
   }
 
   function showForgotPassword() {
@@ -119,10 +237,10 @@ export default function LoginPage() {
       <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 py-10 lg:grid-cols-[1fr_440px]">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-200">
-            PortEdge360
+            PortView360
           </p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            NPA Operations Portal
+            360° Port Operations Portal 
           </h1>
           <p className="mt-4 max-w-xl text-lg leading-8 text-slate-100/85">
             Unified Workflow, Records and Administration Platform
@@ -201,18 +319,30 @@ export default function LoginPage() {
                   <p className="text-xs font-medium text-slate-300">
                     Authorized users only
                   </p>
-                  <button
-                    className="text-sm font-semibold text-cyan-200 transition hover:text-cyan-100"
-                    type="button"
-                    onClick={showForgotPassword}
-                  >
-                    Forgot password?
-                  </button>
+                  <div className="flex flex-col items-end gap-2 text-right">
+                    <button
+                      className="text-sm font-semibold text-cyan-200 transition hover:text-cyan-100 disabled:cursor-wait disabled:text-cyan-100/60"
+                      disabled={isResendingVerification}
+                      type="button"
+                      onClick={handleResendVerification}
+                    >
+                      {isResendingVerification
+                        ? "Sending verification..."
+                        : "Resend verification email"}
+                    </button>
+                    <button
+                      className="text-sm font-semibold text-cyan-200 transition hover:text-cyan-100"
+                      type="button"
+                      onClick={showForgotPassword}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   className="w-full rounded-md bg-cyan-300 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/25 transition hover:bg-cyan-200 disabled:cursor-wait disabled:bg-cyan-100"
-                  disabled={isSigningIn}
+                  disabled={isSigningIn || isResendingVerification}
                   type="submit"
                 >
                   {isSigningIn ? "Signing in..." : "Sign in"}
@@ -292,7 +422,7 @@ export default function LoginPage() {
       </section>
 
       <footer className="mx-auto w-full max-w-6xl pb-2 text-sm text-slate-300/80">
-        Nigerian Ports Authority Operations System
+        © Powered by Starwort and Kane Technologies
       </footer>
     </main>
   );

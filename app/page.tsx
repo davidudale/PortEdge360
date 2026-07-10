@@ -20,7 +20,7 @@ export default function Home() {
             </span>
             <span>
               <span className="block text-base font-semibold leading-5">
-                PortEdge360
+                PortView360
               </span>
               <span className="block text-xs font-medium text-cyan-100/80">
                 Port Authority
@@ -75,7 +75,7 @@ export default function Home() {
                 className="inline-flex items-center justify-center rounded-md bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-xl shadow-cyan-950/25 transition hover:bg-cyan-200"
                 href="/login"
               >
-                Enter PortEdge360
+                Enter PortView360
               </Link>
               <Link
                 className="inline-flex items-center justify-center rounded-md border border-white/25 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15"
@@ -103,6 +103,9 @@ export default function Home() {
           </div>
         ))}
       </section>
+      <footer className=" w-full max-w-6xl py-2 text-sm text-slate-300/80">
+        © Powered by Starwort and Kane Technologies
+      </footer>
     </main>
   );
 }

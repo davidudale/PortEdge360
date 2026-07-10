@@ -1,11 +1,12 @@
 "use client";
 
 import { ToastContainer } from "react-toastify";
+import { AuthProvider } from "./Auth/AuthContext";
 import "react-toastify/dist/ReactToastify.css";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <AuthProvider>
       {children}
       <ToastContainer
         position="top-right"
@@ -18,6 +19,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         pauseOnHover
         theme="colored"
       />
-    </>
+    </AuthProvider>
   );
 }
