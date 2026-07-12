@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
+import { updatePassword } from "firebase/auth";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import Link from "next/link";
 import ProtectedRoute from "../../../Auth/ProtectedRoute";
 import { UserRole } from "../../../Auth/roles";
 import { useAuth } from "../../../Auth/AuthContext";
+import { db } from "../../../Auth/firebase";
 
 type FocusItem = string | {
   content?: ReactNode;
@@ -108,6 +111,128 @@ function getFocusHref(item: FocusItem, label: string) {
   return `#${label.toLowerCase().replaceAll(" ", "-")}`;
 }
 
+function ForcePasswordChangeModal({
+  onComplete,
+}: {
+  onComplete: () => void;
+}) {
+  const { user } = useAuth();
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+
+    if (!user) {
+      setError("Your session is no longer active. Please sign in again.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await updatePassword(user, newPassword);
+      await updateDoc(doc(db, "users", user.uid), {
+        requirePasswordChange: false,
+        status: "active",
+        updatedAt: serverTimestamp(),
+      });
+      onComplete();
+    } catch {
+      setError(
+        "Unable to update password. Sign out and sign in again, then retry.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div
+      aria-labelledby="force-password-title"
+      aria-modal="true"
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/85 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+    >
+      <form
+        className="w-full max-w-md rounded-lg border border-white/10 bg-[#0f172a] p-6 shadow-2xl shadow-black/40"
+        onSubmit={handleSubmit}
+      >
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-500">
+          Security update required
+        </p>
+        <h2
+          className="mt-3 text-2xl font-black text-white"
+          id="force-password-title"
+        >
+          Change your temporary password
+        </h2>
+        <p className="mt-2 text-sm font-medium leading-6 text-slate-400">
+          Your account was created by an administrator. Set a new password before
+          continuing to the dashboard.
+        </p>
+
+        <div className="mt-5 space-y-4">
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+              New password
+            </span>
+            <input
+              autoComplete="new-password"
+              className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-[#111827] px-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-orange-500/60"
+              minLength={8}
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+              Confirm password
+            </span>
+            <input
+              autoComplete="new-password"
+              className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-[#111827] px-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-orange-500/60"
+              minLength={8}
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </label>
+        </div>
+
+        {error && (
+          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-100">
+            {error}
+          </p>
+        )}
+
+        <button
+          className="mt-5 h-11 w-full rounded-lg bg-orange-500 px-4 text-sm font-black uppercase tracking-wider text-white transition hover:bg-orange-400 disabled:cursor-wait disabled:opacity-60"
+          disabled={isSaving}
+          type="submit"
+        >
+          {isSaving ? "Updating password..." : "Update password"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function RoleDashboardShell({
   focusItems,
   role,
@@ -120,6 +245,7 @@ export default function RoleDashboardShell({
   const { profile, signOutUser } = useAuth();
   const displayName = profile?.displayName ?? profile?.email ?? "Authorized user";
   const [activeMenuLabel, setActiveMenuLabel] = useState("Dashboard");
+  const [passwordChangeComplete, setPasswordChangeComplete] = useState(false);
   const focusSidebarItems = focusItems.map((item) => {
     const label = getFocusLabel(item);
 
@@ -147,10 +273,17 @@ export default function RoleDashboardShell({
       : workspaceCopy;
   const activeWorkspaceContent =
     activeMenu && "content" in activeMenu ? activeMenu.content : null;
+  const mustChangePassword =
+    Boolean(profile?.requirePasswordChange) && !passwordChangeComplete;
 
   return (
     <ProtectedRoute allowedRoles={[role]}>
       <main className="min-h-screen bg-[#111827] text-white lg:grid lg:grid-cols-[230px_1fr]">
+        {mustChangePassword && (
+          <ForcePasswordChangeModal
+            onComplete={() => setPasswordChangeComplete(true)}
+          />
+        )}
         <aside className="border-b border-white/10 bg-[#0f172a] px-3 py-7 lg:min-h-screen lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3 px-3">
             <div className="relative grid size-11 place-items-center rounded-full bg-[#020617] text-xs font-black text-white">

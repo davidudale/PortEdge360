@@ -30,6 +30,7 @@ type UserProfile = {
   role?: UserRole;
   status?: string;
   emailVerified?: boolean;
+  requirePasswordChange?: boolean;
 };
 
 type AuthContextValue = {
