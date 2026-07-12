@@ -37,7 +37,34 @@ export const roleSlugs = Object.values(roleDashboardPaths).map((path) =>
 );
 
 export function isUserRole(role: unknown): role is UserRole {
-  return typeof role === "string" && roles.includes(role as UserRole);
+  return getUserRole(role) !== null;
+}
+
+export function getUserRole(role: unknown): UserRole | null {
+  if (typeof role !== "string") {
+    return null;
+  }
+
+  const normalizedRole = role.trim().toLowerCase();
+
+  return (
+    roles.find((knownRole) => knownRole.toLowerCase() === normalizedRole) ??
+    roles.find((knownRole) => {
+      const rolePath = roleDashboardPaths[knownRole].replace("/dashboard/", "");
+      return rolePath === normalizedRole;
+    }) ??
+    null
+  );
+}
+
+export function getUserRoleFromProfile(profile: Record<string, unknown>) {
+  return (
+    getUserRole(profile.role) ??
+    getUserRole(profile.requestedAccessLevel) ??
+    getUserRole(profile.accessLevel) ??
+    getUserRole(profile.userRole) ??
+    getUserRole(profile.dashboardRole)
+  );
 }
 
 export function getDashboardPathForRole(role: UserRole) {

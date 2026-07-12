@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { auth, db } from "../Auth/firebase";
-import { getDashboardPathForRole, isUserRole } from "../Auth/roles";
+import { getDashboardPathForRole, getUserRoleFromProfile } from "../Auth/roles";
 
 type FieldErrors = {
   email?: string;
@@ -52,11 +52,7 @@ async function getUserDashboardPath(uid: string) {
   }
 
   const profile = profileSnap.data();
-  const role = isUserRole(profile.role)
-    ? profile.role
-    : isUserRole(profile.requestedAccessLevel)
-      ? profile.requestedAccessLevel
-      : null;
+  const role = getUserRoleFromProfile(profile);
 
   return role ? getDashboardPathForRole(role) : null;
 }
@@ -234,7 +230,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 -z-10 bg-slate-950/70" />
       <div className="absolute inset-x-0 bottom-0 -z-10 h-64 bg-gradient-to-t from-slate-950 to-transparent" />
 
-      <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 py-10 lg:grid-cols-[1fr_440px]">
+      <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10  lg:grid-cols-[1fr_440px]">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-200">
             PortView360
@@ -250,7 +246,7 @@ export default function LoginPage() {
         <section className="rounded-lg border border-white/20 bg-white/12 p-6 shadow-2xl shadow-slate-950/35 backdrop-blur-xl sm:p-8">
           {mode === "sign-in" ? (
             <>
-              <div className="mb-6">
+              <div className="mb-2">
                 <h2 className="text-2xl font-semibold text-white">
                   Sign in to continue
                 </h2>

@@ -18,7 +18,7 @@ import { auth, db } from "./firebase";
 import {
   UserRole,
   getDashboardPathForRole,
-  isUserRole,
+  getUserRoleFromProfile,
 } from "./roles";
 
 type UserProfile = {
@@ -64,11 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (profileSnap.exists()) {
           const data = profileSnap.data();
-          const nextRole = isUserRole(data.role)
-            ? data.role
-            : isUserRole(data.requestedAccessLevel)
-              ? data.requestedAccessLevel
-              : undefined;
+          const nextRole = getUserRoleFromProfile(data) ?? undefined;
 
           const nextProfile = {
             uid: nextUser.uid,

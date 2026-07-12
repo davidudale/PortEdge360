@@ -42,6 +42,9 @@ function getRegistrationErrorMessage(error: unknown) {
       return "Password is too weak. Use at least 8 characters.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
+    case "auth/unauthorized-continue-uri":
+    case "auth/invalid-continue-uri":
+      return "The email verification redirect URL is not authorized in Firebase.";
     case "permission-denied":
       return "Registration was created, but the profile could not be saved. Check Firestore rules.";
     default:
@@ -134,11 +137,6 @@ export default function RegisterPage() {
         password,
       );
 
-      await updateProfile(credential.user, { displayName });
-      await sendEmailVerification(credential.user, {
-        url: `${window.location.origin}/login`,
-      });
-
       await setDoc(doc(db, "users", credential.user.uid), {
         uid: credential.user.uid,
         firstName: firstName.trim(),
@@ -152,6 +150,11 @@ export default function RegisterPage() {
         status: "pending_email_verification",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      await updateProfile(credential.user, { displayName });
+      await sendEmailVerification(credential.user, {
+        url: `${window.location.origin}/login`,
       });
 
       await signOut(auth);
